@@ -641,8 +641,7 @@ function dur(sec){ const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=se
 function bookDate(r, now){
   const {y,m,d} = now;
   let dt;
-  // an N-day window counts today as day 1, so the newest bookable date is today + (N-1)
-  if(r.rule.type==="days") dt = addDays(y,m,d,r.rule.n-1);
+  if(r.rule.type==="days") dt = addDays(y,m,d,r.rule.n);
   else if(r.rule.type==="semimonthly") dt = (d<15 || (d===15 && now.hh*60+now.mm < r.dropMin)) ? new Date(Date.UTC(y,m,1)) : new Date(Date.UTC(y,m,16));
   else if(/Ambassadors/.test(r.name)) dt = new Date(Date.UTC(y,m,1));
   else dt = new Date(Date.UTC(y,m-1,d));
@@ -677,7 +676,7 @@ function opensText(r, now){
   const {y,m,d} = now;
   if(r.rule.type==="none") return {main:"any date", sub:""};
   if(r.rule.type==="unknown") return {main:"check "+r.plat, sub:""};
-  if(r.rule.type==="days") return {main:fmt(addDays(y,m,d,r.rule.n-1)), sub:""};
+  if(r.rule.type==="days") return {main:fmt(addDays(y,m,d,r.rule.n)), sub:""};
   if(r.rule.type==="semimonthly"){
     // the 15th drop opens the 1st-15th of next month; the 1st drop opens the 16th-EOM of that month
     if(d<15 || (d===15 && now.hh*60+now.mm < r.dropMin))
