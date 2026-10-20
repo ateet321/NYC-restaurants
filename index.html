@@ -144,8 +144,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
 <div class="board">
   <header>
-    <h1>Reservation Drop Board<small>New York City &middot; Departures</small></h1>
-    <div class="clock"><div class="flap sm" id="clock" aria-label="Current time Eastern"></div><div class="d" id="date">&nbsp;</div></div>
+    <h1>Reservation Drop Board<small>New York City &middot; <span id="date">Departures</span></small></h1>
   </header>
 
   <section class="hero" aria-live="polite">
@@ -759,8 +758,7 @@ function buildTimeline(now, L){
 function tick(){
   const now = nyNow();
   const nowSec = now.hh*3600+now.mm*60+now.ss;
-  flap($("clock"), pad(now.hh)+":"+pad(now.mm)+":"+pad(now.ss));
-  $("date").textContent = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric",year:"numeric"}).format(new Date())+" · ET";
+  $("date").textContent = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric"}).format(new Date());
 
   const L = list(now);
   const sig = [now.d, ui.plat, ui.hidePast, ui.q, [...ui.open].join("|"), L.map(r=>r.state[0]).join("")].join("#");
