@@ -195,7 +195,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "21 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/4-charles-prime-rib"
  },
  {
   "name": "Ambassadors Clubhouse",
@@ -224,7 +224,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "28 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/bangkok-supper-club"
  },
  {
   "name": "Carbone",
@@ -254,7 +254,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "14 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/coqodaq"
  },
  {
   "name": "Don Angie",
@@ -313,7 +313,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "28 days in advance",
-  "url": "https://www.gramercytavern.com/reservations/"
+  "url": "https://www.opentable.com/r/gramercy-tavern-new-york"
  },
  {
   "name": "Ha’s Snack Bar",
@@ -387,7 +387,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "14 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/kidilum"
  },
  {
   "name": "Minetta Tavern",
@@ -402,7 +402,7 @@ const REST = [
   "v": false,
   "checked": "2026-10-20",
   "window": "30 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/minetta-tavern"
  },
  {
   "name": "Monkey Bar",
@@ -417,7 +417,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "21 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/monkey-bar-nyc"
  },
  {
   "name": "Ramen By Ra",
@@ -431,7 +431,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "1st & 15th (two-week blocks)",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/ramen-by-ra"
  },
  {
   "name": "Rezdôra",
@@ -461,7 +461,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "15 days in advance",
-  "url": ""
+  "url": "https://www.sevenrooms.com/explore/semma/reservations/create/search/"
  },
  {
   "name": "Shuka",
@@ -535,7 +535,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "30 days in advance",
-  "url": ""
+  "url": "https://resy.com/cities/new-york-ny/venues/the-four-horsemen"
  },
  {
   "name": "Theodora",
@@ -580,7 +580,7 @@ const REST = [
   "v": true,
   "checked": "2026-10-20",
   "window": "14 days in advance",
-  "url": ""
+  "url": "https://www.opentable.com/r/una-pizza-napoletana-new-york"
  },
  {
   "name": "Via Carota",
@@ -637,12 +637,39 @@ function pad(n){ return String(n).padStart(2,"0"); }
 function hms(sec){ sec=Math.max(0,sec); return pad(Math.floor(sec/3600))+":"+pad(Math.floor(sec%3600/60))+":"+pad(sec%60); }
 function dur(sec){ const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return h?`${h}h ${pad(m)}m`:m?`${m}m ${pad(s)}s`:`${s}s`; }
 
-function bookUrl(r){
-  if(r.url) return r.url;
-  const q = encodeURIComponent(r.name);
-  if(r.cls==="resy") return `https://resy.com/cities/new-york-ny/search?query=${q}`;
-  if(r.cls==="opentable") return `https://www.opentable.com/s?term=${q}&metroId=8`;
-  return `https://www.google.com/search?q=${encodeURIComponent(r.name+" NYC "+r.plat+" reservations")}`;
+/* the date to book: the date this drop releases, else the start of the released block, else today */
+function bookDate(r, now){
+  const {y,m,d} = now;
+  let dt;
+  if(r.rule.type==="days") dt = addDays(y,m,d,r.rule.n);
+  else if(r.rule.type==="semimonthly") dt = (d<15 || (d===15 && now.hh*60+now.mm < r.dropMin)) ? new Date(Date.UTC(y,m,1)) : new Date(Date.UTC(y,m,16));
+  else if(/Ambassadors/.test(r.name)) dt = new Date(Date.UTC(y,m,1));
+  else dt = new Date(Date.UTC(y,m-1,d));
+  return dt.toISOString().slice(0,10);
+}
+
+/* booking link pre-filled for 2 guests on bookDate, aiming at 7 PM (middle of 5:30-8:30) */
+const PARTY = 2, TIME = "19:00";
+function bookUrl(r, now){
+  const date = bookDate(r, now), q = encodeURIComponent(r.name);
+  const base = r.url || (r.cls==="resy" ? "https://resy.com/cities/new-york-ny/search"
+                      : r.cls==="opentable" ? "https://www.opentable.com/s" : "");
+  if(!base) return `https://www.google.com/search?q=${encodeURIComponent(r.name+" NYC "+r.plat+" reservations")}`;
+  const u = new URL(base);
+  if(u.hostname.endsWith("resy.com")){
+    u.searchParams.set("date",date); u.searchParams.set("seats",PARTY);
+    if(!r.url) u.searchParams.set("query",r.name);
+  } else if(u.hostname.endsWith("opentable.com")){
+    u.searchParams.set("covers",PARTY); u.searchParams.set("dateTime",date+"T"+TIME);
+    if(!r.url){ u.searchParams.set("term",r.name); u.searchParams.set("metroId","8"); }
+  } else if(u.hostname.endsWith("sevenrooms.com")){
+    u.searchParams.set("date",date); u.searchParams.set("party_size",PARTY); u.searchParams.set("start_time",TIME);
+  }
+  return u.toString();
+}
+function bookLabel(r, now){
+  const dt = new Date(bookDate(r, now)+"T00:00:00Z");
+  return `Book ${fmt(dt)} · 2 guests`;
 }
 
 function opensText(r, now){
@@ -732,7 +759,10 @@ function buildRows(now, L){
          <div><dt>Drop time</dt><dd>${r.dropMin===null?"not published":c.t+" "+c.ap+" ET"}</dd></div>
          <div><dt>Last checked</dt><dd>${esc(r.checked||"—")} ${r.v?"(confirmed)":"(unconfirmed)"}</dd></div>
          ${r.note?`<div style="grid-column:1/-1"><dt>Notes</dt><dd>${esc(r.note)}</dd></div>`:""}
-         <a class="book" href="${esc(bookUrl(r))}" target="_blank" rel="noopener">Book on ${esc(r.plat)} &#8599;</a>
+         <div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+           <a class="book" href="${esc(bookUrl(r,now))}" target="_blank" rel="noopener">${esc(bookLabel(r,now))} &#8599;</a>
+           <span style="font-size:11px;color:var(--dim)">on ${esc(r.plat)}${r.cls==="opentable"?", centred on 7 PM":""} · aim for 5:30–8:30 PM</span>
+         </div>
        </dl>`:""}
      </div>`;
   }
