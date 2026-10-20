@@ -648,8 +648,8 @@ function bookDate(r, now){
   return dt.toISOString().slice(0,10);
 }
 
-/* booking link pre-filled for 2 guests on bookDate, aiming at 6 PM (Ateet's preferred middle time) */
-const PARTY = 2, TIME = "18:00";
+/* booking link pre-filled for 2 guests on bookDate, aiming at 6:30 PM (Ateet's preferred middle time) */
+const PARTY = 2, TIME = "18:30";
 function bookUrl(r, now){
   const date = bookDate(r, now), q = encodeURIComponent(r.name);
   const base = r.url || (r.cls==="resy" ? "https://resy.com/cities/new-york-ny/search"
@@ -761,7 +761,7 @@ function buildRows(now, L){
          ${r.note?`<div style="grid-column:1/-1"><dt>Notes</dt><dd>${esc(r.note)}</dd></div>`:""}
          <div style="grid-column:1/-1;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
            <a class="book" href="${esc(bookUrl(r,now))}" target="_blank" rel="noopener">${esc(bookLabel(r,now))} &#8599;</a>
-           <span style="font-size:11px;color:var(--dim)">on ${esc(r.plat)}${r.cls==="opentable"?", centred on 6 PM":""} · aim for around 6 PM</span>
+           <span style="font-size:11px;color:var(--dim)">on ${esc(r.plat)}${r.cls==="opentable"?", centred on 6:30 PM":""} · aim for around 6:30 PM</span>
          </div>
        </dl>`:""}
      </div>`;
