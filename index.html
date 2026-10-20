@@ -1,0 +1,840 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>NYC Reservation Drop Board</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<style>
+  /* Layout: an airport departures board. Next-drop hero with split-flap countdown, a 24h drop timeline, then filterable rows. */
+  :root{
+    color-scheme:dark;
+    --page:#090b0d;
+    --board:#101418;
+    --board-edge:#1e252c;
+    --slat:#151b21;
+    --slat-hi:#1a2128;
+    --slat-line:#0b0e11;
+    --flap:#1b2128;
+    --flap-seam:#05070a;
+    --amber:#ffb52e;
+    --amber-dim:rgba(255,181,46,.14);
+    --white:#e8ecef;
+    --dim:#7d8791;
+    --soft:#a8b0b8;
+    --green:#3ddc84;
+    --green-dim:rgba(61,220,132,.14);
+    --red:#ff5c5c;
+    --resy:#ff4b33;
+    --ot:#da3743;
+    --other:#5a9bd5;
+    --chip-fg:#ffffff;
+    --mono:"JetBrains Mono","Courier New",monospace;
+    --sans:"IBM Plex Sans Condensed","Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--page);color:var(--white);font-family:var(--sans);
+    padding-block:14px 40px;
+    padding-left:max(16px,env(safe-area-inset-left,0px));
+    padding-right:max(16px,env(safe-area-inset-right,0px));
+  }
+  button,input{font:inherit;color:inherit}
+  .board{max-width:780px;margin:0 auto;background:var(--board);border:1px solid var(--board-edge);border-radius:10px;overflow:hidden;box-shadow:0 10px 40px rgba(0,0,0,.6)}
+
+  header{padding:16px 16px 12px;border-bottom:2px solid var(--slat-line);display:flex;justify-content:space-between;align-items:flex-end;gap:10px;flex-wrap:wrap}
+  h1{font-family:var(--mono);font-size:15px;letter-spacing:.22em;color:var(--amber);font-weight:700;text-transform:uppercase}
+  h1 small{display:block;color:var(--dim);font-size:10px;letter-spacing:.28em;margin-top:4px;font-weight:400}
+  .clock{text-align:right}
+  .clock .d{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.18em;text-transform:uppercase;margin-top:4px}
+
+  /* split-flap characters */
+  .flap{display:inline-flex;gap:2px;font-family:var(--mono);font-weight:700;font-variant-numeric:tabular-nums}
+  .flap span{position:relative;display:inline-block;min-width:.72em;text-align:center;background:var(--flap);border-radius:3px;padding:.06em .08em;line-height:1.15;color:var(--white)}
+  .flap span::after{content:"";position:absolute;left:0;right:0;top:50%;height:1px;background:var(--flap-seam)}
+  .flap span.sep{background:none;min-width:.35em;color:var(--dim)}
+  .flap span.sep::after{display:none}
+  .flap.sm{font-size:20px}
+  .flap.lg{font-size:clamp(28px,8vw,44px)}
+  .flap.lg span{color:var(--amber)}
+  @media(prefers-reduced-motion:no-preference){
+    .flap span.flip{animation:flip .38s ease-out}
+    @keyframes flip{0%{transform:rotateX(90deg);filter:brightness(1.8)}60%{transform:rotateX(-12deg)}100%{transform:none}}
+  }
+
+  .hero{padding:16px;border-bottom:2px solid var(--slat-line);background:linear-gradient(180deg,#141a20,var(--board));display:grid;gap:12px}
+  .hero .lbl{font-family:var(--mono);color:var(--dim);text-transform:uppercase;font-size:10px;letter-spacing:.24em}
+  .hero .top{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
+  .hero .names{font-size:15px;font-weight:600;margin-top:6px;line-height:1.4}
+  .hero .sub{font-family:var(--mono);font-size:11px;color:var(--soft);margin-top:4px;letter-spacing:.04em}
+  .hero .stats{display:flex;gap:16px;flex-wrap:wrap;font-family:var(--mono);font-size:11px;color:var(--dim);letter-spacing:.06em}
+  .hero .stats b{color:var(--white);font-size:13px}
+
+  /* 24h timeline */
+  .tl{position:relative;height:42px;margin-top:2px}
+  .tl .rail{position:absolute;left:0;right:0;top:16px;height:4px;border-radius:2px;background:var(--slat-hi)}
+  .tl .gone{position:absolute;left:0;top:16px;height:4px;border-radius:2px;background:var(--amber-dim)}
+  .tl .dot{position:absolute;top:12px;width:12px;height:12px;margin-left:-6px;border-radius:50%;border:2px solid var(--board);cursor:pointer;padding:0}
+  .tl .dot.past{opacity:.35}
+  .tl .dot:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+  .tl .now{position:absolute;top:6px;width:2px;height:24px;margin-left:-1px;background:var(--amber);box-shadow:0 0 8px var(--amber)}
+  .tl .tick{position:absolute;top:30px;font-family:var(--mono);font-size:9px;color:var(--dim);transform:translateX(-50%);letter-spacing:.08em}
+  .tl .tick:first-of-type{transform:none}
+  .tl .tick.end{transform:translateX(-100%)}
+
+  .controls{padding:12px 16px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;border-bottom:2px solid var(--slat-line);background:var(--board)}
+  .search{flex:1 1 180px;min-width:0;background:var(--slat);border:1px solid var(--board-edge);border-radius:6px;padding:8px 10px;font-size:13px}
+  .search::placeholder{color:var(--dim)}
+  .search:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+  .seg{display:flex;gap:4px;flex-wrap:wrap}
+  .pill{background:var(--slat);border:1px solid var(--board-edge);border-radius:999px;padding:6px 11px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);cursor:pointer}
+  .pill[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#111}
+  .pill:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+
+  .row{display:grid;grid-template-columns:56px minmax(0,1fr) 104px;gap:8px;align-items:center;padding:11px 14px;background:var(--slat);border-bottom:1px solid var(--slat-line);border-left:3px solid transparent;cursor:pointer;transition:background .15s}
+  .row:hover{background:var(--slat-hi)}
+  .row:focus-visible{outline:2px solid var(--amber);outline-offset:-2px}
+  .row.soon{border-left-color:var(--amber);background:linear-gradient(90deg,var(--amber-dim),var(--slat) 40%)}
+  .row.live{border-left-color:var(--green);background:linear-gradient(90deg,var(--green-dim),var(--slat) 50%)}
+  .row.past .time,.row.past .opens .date{color:var(--dim)}
+  .row.flash{animation:flash 1.2s ease-out}
+  @keyframes flash{0%{background:var(--amber-dim)}100%{background:var(--slat)}}
+  .time{font-family:var(--mono);font-size:14px;font-weight:700;color:var(--amber);font-variant-numeric:tabular-nums}
+  .time small{display:block;font-size:9px;color:var(--dim);letter-spacing:.14em;font-weight:400}
+  .who{min-width:0}
+  .who .name{font-size:14px;font-weight:600}
+  .who .name .ok{color:var(--green);font-size:10px}
+  .who .name .q{color:var(--red);font-size:10px}
+  .who .meta{margin-top:3px;font-size:11px;color:var(--dim);display:flex;gap:6px;align-items:center;flex-wrap:wrap;line-height:1.4}
+  .chip{font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:3px;color:var(--chip-fg)}
+  .chip.resy{background:var(--resy)}
+  .chip.opentable{background:var(--ot)}
+  .chip.other{background:var(--other)}
+  .opens{text-align:right;font-family:var(--mono)}
+  .opens .lbl{font-size:8px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase}
+  .opens .date{font-size:13px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums}
+  .opens .date.done{color:var(--green)}
+  .status{font-size:10px;margin-top:3px;letter-spacing:.06em;font-variant-numeric:tabular-nums}
+  .status.live{color:var(--green);font-weight:700}
+  .status.soon{color:var(--amber)}
+  .status.past{color:var(--dim)}
+  @media(prefers-reduced-motion:no-preference){
+    .status.live{animation:blink 1.2s steps(2) infinite}
+    @keyframes blink{50%{opacity:.35}}
+  }
+  .detail{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px 16px;padding:10px 0 2px;border-top:1px dashed var(--board-edge);margin-top:6px;font-size:12px}
+  .detail dt{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;text-transform:uppercase}
+  .detail dd{color:var(--soft);margin-top:2px}
+  .book{justify-self:start;align-self:end;background:var(--amber);color:#111;text-decoration:none;font-family:var(--mono);font-weight:700;font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:7px 12px;border-radius:5px}
+  .book:focus-visible{outline:2px solid var(--white);outline-offset:2px}
+  .group{padding:8px 14px 6px;font-family:var(--mono);font-size:9px;letter-spacing:.26em;text-transform:uppercase;color:var(--dim);background:var(--board);border-bottom:1px solid var(--slat-line)}
+  .empty{padding:24px 16px;text-align:center;color:var(--dim);font-size:13px}
+
+  footer{padding:12px 16px;font-size:10px;color:var(--dim);line-height:1.6;letter-spacing:.04em}
+  footer b{color:var(--soft)}
+  @media(max-width:420px){
+    .row{grid-template-columns:48px minmax(0,1fr) 92px;padding:10px}
+    .who .name{font-size:13px}
+    .flap.sm{font-size:17px}
+  }
+</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Condensed:wght@400;600&family=JetBrains+Mono:wght@400;700&display=swap">
+<div class="board">
+  <header>
+    <h1>Reservation Drop Board<small>New York City &middot; Departures</small></h1>
+    <div class="clock"><div class="flap sm" id="clock" aria-label="Current time Eastern"></div><div class="d" id="date">&nbsp;</div></div>
+  </header>
+
+  <section class="hero" aria-live="polite">
+    <div class="top">
+      <div>
+        <div class="lbl" id="heroLbl">Next drop in</div>
+        <div class="names" id="heroNames">&nbsp;</div>
+        <div class="sub" id="heroSub">&nbsp;</div>
+      </div>
+      <div class="flap lg" id="countdown" aria-label="Countdown to next drop"></div>
+    </div>
+    <div class="tl" id="tl" aria-label="Today's drops on a 24-hour timeline"></div>
+    <div class="stats" id="stats"></div>
+  </section>
+
+  <div class="controls">
+    <input class="search" id="q" type="search" placeholder="Search restaurants or notes" aria-label="Search restaurants">
+    <div class="seg" role="group" aria-label="Platform">
+      <button class="pill" data-plat="all" aria-pressed="true">All</button>
+      <button class="pill" data-plat="resy" aria-pressed="false">Resy</button>
+      <button class="pill" data-plat="opentable" aria-pressed="false">OpenTable</button>
+      <button class="pill" data-plat="other" aria-pressed="false">Other</button>
+    </div>
+    <button class="pill" id="hidePast" aria-pressed="false">Hide dropped</button>
+  </div>
+
+  <div id="rows"></div>
+
+  <footer>
+    All times <b>Eastern</b>. "Opens" = the reservation date released at that drop. Tap a row for details and a booking link.
+    <b>Ramen By Ra</b> drops only on the 1st &amp; 15th; <b>Ambassadors Clubhouse</b> releases about two weeks before each month.
+    29 restaurants. Last checked 2026-10-20 against venue sites, Resy, The Infatuation and trackers (itsadate.nyc, ReservationFinder, Snatchd).
+    &#10003; = confirmed by at least two sources or the venue; ? = not confirmed. Restaurants change these without notice.
+  </footer>
+</div>
+<script>
+const REST = [
+ {
+  "name": "4 Charles Prime Rib",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 21
+  },
+  "note": "",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "21 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Ambassadors Clubhouse",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": null,
+  "rule": {
+   "type": "none"
+  },
+  "note": "next month released in one block ~2 weeks before the 1st (venue FAQ); Priority List emailed first; time not published",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "no fixed rolling window",
+  "url": ""
+ },
+ {
+  "name": "Bangkok Supper Club",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 0,
+  "rule": {
+   "type": "days",
+   "n": 28
+  },
+  "note": "confirmed open; 641 Hudson St (Meatpacking); ~25% of room + 11-seat bar for walk-ins; per Resy’s “One Who Keeps the Book,” Sept 2026",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "28 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Carbone",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Coqodaq",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "14d confirmed (13d was a measurement artifact); walk-ins: patio, bar, high-tops; per Resy’s “One Who Keeps the Book,” Sept 2026",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Don Angie",
+  "plat": "OpenTable",
+  "cls": "opentable",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 7
+  },
+  "note": "7 days at 9 AM per itsadate.nyc tracker",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "7 days in advance",
+  "url": "https://www.opentable.com/r/don-angie-new-york"
+ },
+ {
+  "name": "Elder",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": null,
+  "rule": {
+   "type": "none"
+  },
+  "note": "also OpenTable/SevenRooms/DoorDash; opened Aug 2026; no fixed drop",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "no fixed rolling window",
+  "url": "https://www.opentable.com/r/indienne-elder-british-indian-chophouse-new-york"
+ },
+ {
+  "name": "Graciela",
+  "plat": "OpenTable",
+  "cls": "opentable",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "14 days at ~10 AM per Infatuation and ReservationFinder monitors",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": "https://www.opentable.com/r/graciela-new-york"
+ },
+ {
+  "name": "Gramercy Tavern",
+  "plat": "OpenTable",
+  "cls": "opentable",
+  "dropMin": 720,
+  "rule": {
+   "type": "days",
+   "n": 28
+  },
+  "note": "28 days at noon per venue site; front Tavern room is walk-in",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "28 days in advance",
+  "url": "https://www.gramercytavern.com/reservations/"
+ },
+ {
+  "name": "Ha’s Snack Bar",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 720,
+  "rule": {
+   "type": "days",
+   "n": 21
+  },
+  "note": "21 days at noon per two trackers (itsadate.nyc, ReservationFinder)",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "21 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Humm",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 720,
+  "rule": {
+   "type": "days",
+   "n": 21
+  },
+  "note": "opened Oct 10, 2026; per restaurant FAQ",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "21 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Hungry Spicy",
+  "plat": "OpenTable",
+  "cls": "opentable",
+  "dropMin": null,
+  "rule": {
+   "type": "none"
+  },
+  "note": "Thai, 114 8th Ave (Chelsea); OpenTable shows same-day tables, no fixed drop",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "no fixed rolling window",
+  "url": "https://www.opentable.com/r/hungry-spicy-new-york"
+ },
+ {
+  "name": "I Cavallini",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 480,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "8 AM drop",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Kidilum",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 660,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "CORRECTED to 14 days (was 7); walk-ins at bar; closed Mon; per Resy’s “One Who Keeps the Book,” Sept 2026",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Minetta Tavern",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 0,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "30 days at midnight per Snatchd and itsadate.nyc, but both call the time an estimate; call (212) 475-3850",
+  "v": false,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Monkey Bar",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 21
+  },
+  "note": "bar is first-come; 21 days at 9 AM per Resy (Sept 10) and itsadate.nyc",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "21 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Ramen By Ra",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 540,
+  "rule": {
+   "type": "semimonthly"
+  },
+  "note": "",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "1st & 15th (two-week blocks)",
+  "url": ""
+ },
+ {
+  "name": "Rezdôra",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 0,
+  "rule": {
+   "type": "days",
+   "n": 29
+  },
+  "note": "29d at midnight per Snatchd (Oct 7); one older tracker says SevenRooms 30d; sells out in 30-60s; CC required",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "29 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Semma",
+  "plat": "SevenRooms",
+  "cls": "other",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 15
+  },
+  "note": "CHANGED: now SevenRooms/Dorsia, 15 days (was Resy/7)",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "15 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Shuka",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": null,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "30 days ahead per itsadate.nyc; release time not published; walk-ins welcome",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": "https://resy.com/cities/new-york-ny/venues/shuka"
+ },
+ {
+  "name": "Somssi",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "walk-ins at bar + dining room",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": "https://resy.com/cities/new-york-ny/venues/somssi"
+ },
+ {
+  "name": "Straker’s",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": null,
+  "rule": {
+   "type": "unknown"
+  },
+  "note": "NEW: Thomas Straker; opened Oct 10, 2026 at 59 Grand St (Soho); also on Dorsia; window/time not published yet",
+  "v": false,
+  "checked": "2026-10-20",
+  "window": "unknown",
+  "url": "https://resy.com/cities/new-york-ny/venues/strakers-nyc"
+ },
+ {
+  "name": "Tatiana by Kwame Onwuachi",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 720,
+  "rule": {
+   "type": "days",
+   "n": 28
+  },
+  "note": "",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "28 days in advance",
+  "url": ""
+ },
+ {
+  "name": "The Four Horsemen",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 420,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "7 AM drop — earliest on the board",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Theodora",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "confirmed; bar seats held for walk-ins; per Resy’s “One Who Keeps the Book,” Sept 2026",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Torrisi",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Una Pizza Napoletana",
+  "plat": "OpenTable",
+  "cls": "opentable",
+  "dropMin": 540,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "Thu-Sat only",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Via Carota",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "limited slots; 30d/10 AM per two trackers, but venue FAQ still says walk-in only",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
+  "name": "Wild Cherry",
+  "plat": "SevenRooms",
+  "cls": "other",
+  "dropMin": 0,
+  "rule": {
+   "type": "days",
+   "n": 14
+  },
+  "note": "SevenRooms only, 14 days at midnight per venue FAQ; bar mostly held for walk-ins",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "14 days in advance",
+  "url": "https://www.sevenrooms.com/explore/wildcherry/reservations/create/search/"
+ }
+];
+
+const $ = id => document.getElementById(id);
+const store = {
+  get(k,d){ try{ const v=localStorage.getItem("dropboard."+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
+  set(k,v){ try{ localStorage.setItem("dropboard."+k, JSON.stringify(v)); }catch(e){} }
+};
+const ui = { plat:store.get("plat","all"), hidePast:store.get("hidePast",false), q:"", open:new Set() };
+
+function nyNow(){
+  const p = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",
+    year:"numeric",month:"numeric",day:"numeric",hour:"numeric",minute:"numeric",second:"numeric",hour12:false,weekday:"short"})
+    .formatToParts(new Date());
+  const g = t => p.find(x=>x.type===t).value;
+  return {y:+g("year"), m:+g("month"), d:+g("day"), hh:+g("hour")%24, mm:+g("minute"), ss:+g("second"), dow:g("weekday")};
+}
+function addDays(y,m,d,n){ return new Date(Date.UTC(y,m-1,d+n)); }
+function fmt(dt){ return dt.toLocaleDateString("en-US",{timeZone:"UTC",weekday:"short",month:"short",day:"numeric"}); }
+function fmtFull(dt){ return dt.toLocaleDateString("en-US",{timeZone:"UTC",month:"short",day:"numeric"}); }
+function clock12(min){ const h=Math.floor(min/60), m=min%60; return {t:(((h+11)%12)+1)+":"+String(m).padStart(2,"0"), ap:h<12?"AM":"PM"}; }
+function esc(s){ return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function pad(n){ return String(n).padStart(2,"0"); }
+function hms(sec){ sec=Math.max(0,sec); return pad(Math.floor(sec/3600))+":"+pad(Math.floor(sec%3600/60))+":"+pad(sec%60); }
+function dur(sec){ const h=Math.floor(sec/3600), m=Math.floor(sec%3600/60), s=sec%60; return h?`${h}h ${pad(m)}m`:m?`${m}m ${pad(s)}s`:`${s}s`; }
+
+function bookUrl(r){
+  if(r.url) return r.url;
+  const q = encodeURIComponent(r.name);
+  if(r.cls==="resy") return `https://resy.com/cities/new-york-ny/search?query=${q}`;
+  if(r.cls==="opentable") return `https://www.opentable.com/s?term=${q}&metroId=8`;
+  return `https://www.google.com/search?q=${encodeURIComponent(r.name+" NYC "+r.plat+" reservations")}`;
+}
+
+function opensText(r, now){
+  const {y,m,d} = now;
+  if(r.rule.type==="none") return {main:"any date", sub:""};
+  if(r.rule.type==="unknown") return {main:"check "+r.plat, sub:""};
+  if(r.rule.type==="days") return {main:fmt(addDays(y,m,d,r.rule.n)), sub:""};
+  if(r.rule.type==="semimonthly"){
+    // the 15th drop opens the 1st-15th of next month; the 1st drop opens the 16th-EOM of that month
+    if(d<15 || (d===15 && now.hh*60+now.mm < r.dropMin))
+      return {main:`${fmtFull(new Date(Date.UTC(y,m,1)))}–${fmtFull(new Date(Date.UTC(y,m,15)))}`, sub:"next: "+fmt(new Date(Date.UTC(y,m-1,15)))};
+    return {main:`${fmtFull(new Date(Date.UTC(y,m,16)))}–EOM`, sub:"next: "+fmt(new Date(Date.UTC(y,m,1)))};
+  }
+  return {main:"—", sub:""};
+}
+
+function dropsOn(r, day){
+  if(r.dropMin===null) return false;
+  if(r.rule.type==="semimonthly") return day===1||day===15;
+  return r.rule.type==="days";
+}
+
+function stateOf(r, now){
+  const nowMin = now.hh*60+now.mm;
+  if(r.dropMin===null) return "none";
+  if(!dropsOn(r,now.d)) return "off";
+  if(nowMin>=r.dropMin && nowMin<r.dropMin+2) return "live";
+  if(nowMin<r.dropMin) return r.dropMin-nowMin<=60?"soon":"upcoming";
+  return "past";
+}
+
+/* split-flap writer: only changed characters flip */
+function flap(el, str){
+  const cur = el.children;
+  if(cur.length!==str.length){
+    el.innerHTML = [...str].map(c=>`<span class="${/[0-9A-Z]/i.test(c)?"":"sep"}">${esc(c)}</span>`).join("");
+    return;
+  }
+  [...str].forEach((c,i)=>{
+    const s = cur[i];
+    if(s.textContent!==c){
+      s.textContent=c; s.className=/[0-9A-Z]/i.test(c)?"":"sep";
+      if(!s.classList.contains("sep")){ void s.offsetWidth; s.classList.add("flip"); }
+    }
+  });
+}
+
+let lastSig = "";
+function list(now){
+  const order = {live:0,soon:1,upcoming:2,past:3,off:4,none:5};
+  return REST.map(r=>({...r,state:stateOf(r,now),sortMin:r.dropMin===null?Infinity:r.dropMin}))
+    .sort((a,b)=> order[a.state]-order[b.state] || a.sortMin-b.sortMin || a.name.localeCompare(b.name));
+}
+
+function visible(r){
+  if(ui.plat!=="all" && r.cls!==ui.plat) return false;
+  if(ui.hidePast && r.state==="past") return false;
+  if(ui.q){ const q=ui.q.toLowerCase(); if(!(r.name.toLowerCase().includes(q)||(r.note||"").toLowerCase().includes(q)||r.plat.toLowerCase().includes(q))) return false; }
+  return true;
+}
+
+const GROUP = {live:"Dropping now",soon:"Within the hour",upcoming:"Later today",past:"Already dropped today",off:"No drop today",none:"No fixed drop"};
+
+function buildRows(now, L){
+  const rows = $("rows");
+  const shown = L.filter(visible);
+  if(!shown.length){ rows.innerHTML = `<div class="empty">No restaurants match. Clear the search or pick another platform.</div>`; return; }
+  let html = "", g = null;
+  for(const r of shown){
+    if(r.state!==g){ g=r.state; html += `<div class="group">${GROUP[g]}</div>`; }
+    const o = opensText(r, now);
+    const c = r.dropMin===null?{t:"—",ap:""}:clock12(r.dropMin);
+    const open = ui.open.has(r.name);
+    html += `<div class="row ${r.state}" tabindex="0" role="button" aria-expanded="${open}" data-name="${esc(r.name)}">
+       <div class="time">${c.t}<small>${c.ap||"&nbsp;"}</small></div>
+       <div class="who">
+         <div class="name">${esc(r.name)} ${r.v?`<span class="ok" title="confirmed">&#10003;</span>`:`<span class="q" title="not confirmed">?</span>`}</div>
+         <div class="meta"><span class="chip ${r.cls}">${esc(r.plat)}</span>${r.note&&!open?`<span>${esc(r.note)}</span>`:""}</div>
+       </div>
+       <div class="opens">
+         <div class="lbl">opens</div>
+         <div class="date${r.state==="past"?" done":""}">${o.main}</div>
+         <div class="status" data-cd="${esc(r.name)}">${o.sub?esc(o.sub):""}</div>
+       </div>
+       ${open?`<dl class="detail">
+         <div><dt>Booking window</dt><dd>${esc(r.window)}</dd></div>
+         <div><dt>Drop time</dt><dd>${r.dropMin===null?"not published":c.t+" "+c.ap+" ET"}</dd></div>
+         <div><dt>Last checked</dt><dd>${esc(r.checked||"—")} ${r.v?"(confirmed)":"(unconfirmed)"}</dd></div>
+         ${r.note?`<div style="grid-column:1/-1"><dt>Notes</dt><dd>${esc(r.note)}</dd></div>`:""}
+         <a class="book" href="${esc(bookUrl(r))}" target="_blank" rel="noopener">Book on ${esc(r.plat)} &#8599;</a>
+       </dl>`:""}
+     </div>`;
+  }
+  rows.innerHTML = html;
+}
+
+function buildTimeline(now, L){
+  const nowMin = now.hh*60+now.mm+now.ss/60;
+  const today = L.filter(r=>dropsOn(r,now.d));
+  const byMin = {};
+  today.forEach(r=>(byMin[r.dropMin]=byMin[r.dropMin]||[]).push(r));
+  const color = {resy:"var(--resy)",opentable:"var(--ot)",other:"var(--other)"};
+  let h = `<div class="rail"></div><div class="gone" style="width:${nowMin/1440*100}%"></div>`;
+  for(const [min,rs] of Object.entries(byMin)){
+    const c=clock12(+min), past=+min+2<=nowMin;
+    h += `<button class="dot${past?" past":""}" style="left:${min/1440*100}%;background:${color[rs[0].cls]}" data-min="${min}" title="${c.t} ${c.ap}: ${esc(rs.map(r=>r.name).join(", "))}" aria-label="${c.t} ${c.ap}: ${esc(rs.map(r=>r.name).join(", "))}"></button>`;
+  }
+  h += `<div class="now" style="left:${nowMin/1440*100}%"></div>`;
+  [["12A",0],["6A",360],["12P",720],["6P",1080],["12A",1440]].forEach(([l,m],i)=>{ h += `<div class="tick${i===4?" end":""}" style="left:${m/1440*100}%">${l}</div>`; });
+  $("tl").innerHTML = h;
+}
+
+function tick(){
+  const now = nyNow();
+  const nowSec = now.hh*3600+now.mm*60+now.ss;
+  flap($("clock"), pad(now.hh)+":"+pad(now.mm)+":"+pad(now.ss));
+  $("date").textContent = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric",year:"numeric"}).format(new Date())+" · ET";
+
+  const L = list(now);
+  const sig = [now.d, ui.plat, ui.hidePast, ui.q, [...ui.open].join("|"), L.map(r=>r.state[0]).join("")].join("#");
+  if(sig!==lastSig){ lastSig=sig; buildRows(now,L); }
+  if(now.ss===0 || !$("tl").children.length) buildTimeline(now,L);
+
+  // hero
+  const live = L.filter(r=>r.state==="live");
+  const up = L.filter(r=>r.state==="soon"||r.state==="upcoming");
+  if(live.length){
+    $("heroLbl").textContent = "Dropping now";
+    $("heroNames").textContent = live.map(r=>r.name).join(" · ");
+    $("heroSub").textContent = live.map(r=>`${r.name}: ${opensText(r,now).main}`).join(" · ");
+    flap($("countdown"), "LIVE");
+  } else if(up.length){
+    const t = up[0].dropMin, rs = up.filter(r=>r.dropMin===t), c = clock12(t);
+    $("heroLbl").textContent = `Next drop · ${c.t} ${c.ap} ET`;
+    $("heroNames").textContent = rs.map(r=>r.name).join(" · ");
+    $("heroSub").textContent = "Opens " + [...new Set(rs.map(r=>opensText(r,now).main))].join(" / ");
+    flap($("countdown"), hms(t*60-nowSec));
+  } else {
+    const tmr = addDays(now.y,now.m,now.d,1).getUTCDate();
+    const t = REST.filter(r=>dropsOn(r,tmr)).reduce((a,r)=>Math.min(a,r.dropMin),Infinity);
+    if(isFinite(t)){
+      const c=clock12(t), rs=REST.filter(r=>dropsOn(r,tmr)&&r.dropMin===t);
+      $("heroLbl").textContent = `Done for today · first drop tomorrow ${c.t} ${c.ap} ET`;
+      $("heroNames").textContent = rs.map(r=>r.name).join(" · ");
+      $("heroSub").textContent = "";
+      flap($("countdown"), hms(86400-nowSec+t*60));
+    }
+  }
+  const todayN = L.filter(r=>dropsOn(r,now.d)).length;
+  const left = L.filter(r=>["live","soon","upcoming"].includes(r.state)).length;
+  const hour = L.filter(r=>r.state==="soon"||r.state==="live").length;
+  $("stats").innerHTML = `<span><b>${todayN}</b> drop${todayN===1?"":"s"} today</span><span><b>${left}</b> still to come</span><span><b>${hour}</b> in the next hour</span><span><b>${REST.length-todayN}</b> no drop today</span>`;
+
+  // per-row countdowns
+  for(const el of document.querySelectorAll("[data-cd]")){
+    const r = L.find(x=>x.name===el.dataset.cd); if(!r) continue;
+    if(r.state==="soon"||r.state==="upcoming"){ el.className="status "+(r.state==="soon"?"soon":"past"); el.textContent="in "+dur(r.dropMin*60-nowSec); }
+    else if(r.state==="live"){ el.className="status live"; el.textContent="DROPPING"; }
+    else if(r.state==="past"){ el.className="status past"; el.textContent="dropped"; }
+    else if(!el.textContent){ el.className="status past"; el.textContent = r.state==="off"?"no drop today":"anytime"; }
+  }
+}
+
+/* controls */
+document.querySelectorAll("[data-plat]").forEach(b=>{
+  b.setAttribute("aria-pressed", String(b.dataset.plat===ui.plat));
+  b.addEventListener("click",()=>{
+    ui.plat=b.dataset.plat; store.set("plat",ui.plat);
+    document.querySelectorAll("[data-plat]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    tick();
+  });
+});
+$("hidePast").setAttribute("aria-pressed",String(ui.hidePast));
+$("hidePast").addEventListener("click",e=>{ ui.hidePast=!ui.hidePast; store.set("hidePast",ui.hidePast); e.currentTarget.setAttribute("aria-pressed",String(ui.hidePast)); tick(); });
+$("q").addEventListener("input",e=>{ ui.q=e.target.value.trim(); tick(); });
+function toggle(row){ const n=row.dataset.name; ui.open.has(n)?ui.open.delete(n):ui.open.add(n); tick(); }
+$("rows").addEventListener("click",e=>{ if(e.target.closest("a")) return; const row=e.target.closest(".row"); if(row) toggle(row); });
+$("rows").addEventListener("keydown",e=>{ if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("row")){ e.preventDefault(); toggle(e.target); } });
+$("tl").addEventListener("click",e=>{
+  const d=e.target.closest(".dot"); if(!d) return;
+  const names = REST.filter(r=>String(r.dropMin)===d.dataset.min).map(r=>r.name);
+  ui.q=""; $("q").value=""; ui.plat="all"; document.querySelectorAll("[data-plat]").forEach(x=>x.setAttribute("aria-pressed",String(x.dataset.plat==="all")));
+  tick();
+  const rows=[...document.querySelectorAll(".row")].filter(r=>names.includes(r.dataset.name));
+  if(rows[0]) rows[0].scrollIntoView({behavior:"smooth",block:"center"});
+  rows.forEach(r=>{ r.classList.remove("flash"); void r.offsetWidth; r.classList.add("flash"); });
+});
+
+tick();
+setInterval(tick,1000);
+</script>
+
+</body>
+</html>
