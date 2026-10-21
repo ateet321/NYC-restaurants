@@ -92,6 +92,7 @@
   .seg{display:flex;gap:4px;flex-wrap:wrap}
   .pill{background:var(--slat);border:1px solid var(--board-edge);border-radius:999px;padding:6px 11px;font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--soft);cursor:pointer}
   .pill[aria-pressed="true"]{background:var(--amber);border-color:var(--amber);color:#111}
+  .seglbl{align-self:center;font-family:var(--mono);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-right:2px}
   .pill:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
 
   .row{display:grid;grid-template-columns:56px minmax(0,1fr) 104px;gap:8px;align-items:center;padding:11px 14px;background:var(--slat);border-bottom:1px solid var(--slat-line);border-left:3px solid transparent;cursor:pointer;transition:background .15s}
@@ -161,6 +162,11 @@
   </section>
 
   <div class="controls">
+    <div class="seg" role="group" aria-label="Party size">
+      <span class="seglbl">Guests</span>
+      <button class="pill" data-party="2" aria-pressed="true">2</button>
+      <button class="pill" data-party="4" aria-pressed="false">4</button>
+    </div>
     <input class="search" id="q" type="search" placeholder="Search restaurants or notes" aria-label="Search restaurants">
     <div class="seg" role="group" aria-label="Platform">
       <button class="pill" data-plat="all" aria-pressed="true">All</button>
@@ -664,7 +670,7 @@ const store = {
   get(k,d){ try{ const v=localStorage.getItem("dropboard."+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
   set(k,v){ try{ localStorage.setItem("dropboard."+k, JSON.stringify(v)); }catch(e){} }
 };
-const ui = { plat:store.get("plat","all"), hidePast:store.get("hidePast",false), q:"", open:new Set() };
+const ui = { party:[2,4].includes(store.get("party",2))?store.get("party",2):2, plat:store.get("plat","all"), hidePast:store.get("hidePast",false), q:"", open:new Set() };
 
 function nyNow(){
   const p = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",
@@ -693,8 +699,8 @@ function bookDate(r, now){
   return dt.toISOString().slice(0,10);
 }
 
-/* booking link pre-filled for 2 guests on bookDate, aiming at 6:30 PM (Ateet's preferred middle time) */
-const PARTY = 2, TIME = "18:30";
+/* booking link pre-filled for the chosen party size on bookDate, aiming at 6:30 PM (Ateet's preferred middle time) */
+const TIME = "18:30";
 function bookUrl(r, now){
   const date = bookDate(r, now), q = encodeURIComponent(r.name);
   const base = r.url || (r.cls==="resy" ? "https://resy.com/cities/new-york-ny/search"
@@ -702,19 +708,19 @@ function bookUrl(r, now){
   if(!base) return `https://www.google.com/search?q=${encodeURIComponent(r.name+" NYC "+r.plat+" reservations")}`;
   const u = new URL(base);
   if(u.hostname.endsWith("resy.com")){
-    u.searchParams.set("date",date); u.searchParams.set("seats",PARTY);
+    u.searchParams.set("date",date); u.searchParams.set("seats",ui.party);
     if(!r.url) u.searchParams.set("query",r.name);
   } else if(u.hostname.endsWith("opentable.com")){
-    u.searchParams.set("covers",PARTY); u.searchParams.set("dateTime",date+"T"+TIME);
+    u.searchParams.set("covers",ui.party); u.searchParams.set("dateTime",date+"T"+TIME);
     if(!r.url){ u.searchParams.set("term",r.name); u.searchParams.set("metroId","8"); }
   } else if(u.hostname.endsWith("sevenrooms.com")){
-    u.searchParams.set("date",date); u.searchParams.set("party_size",PARTY); u.searchParams.set("start_time",TIME);
+    u.searchParams.set("date",date); u.searchParams.set("party_size",ui.party); u.searchParams.set("start_time",TIME);
   }
   return u.toString();
 }
 function bookLabel(r, now){
   const dt = new Date(bookDate(r, now)+"T00:00:00Z");
-  return `Book ${fmt(dt)} · 2 guests`;
+  return `Book ${fmt(dt)} · ${ui.party} guests`;
 }
 
 function opensText(r, now){
@@ -836,7 +842,7 @@ function tick(){
   $("date").textContent = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",weekday:"long",month:"long",day:"numeric"}).format(new Date());
 
   const L = list(now);
-  const sig = [now.d, ui.plat, ui.hidePast, ui.q, [...ui.open].join("|"), L.map(r=>r.state[0]).join("")].join("#");
+  const sig = [now.d, ui.party, ui.plat, ui.hidePast, ui.q, [...ui.open].join("|"), L.map(r=>r.state[0]).join("")].join("#");
   if(sig!==lastSig){ lastSig=sig; buildRows(now,L); }
   if(now.ss===0 || !$("tl").children.length) buildTimeline(now,L);
 
@@ -886,6 +892,14 @@ document.querySelectorAll("[data-plat]").forEach(b=>{
   b.addEventListener("click",()=>{
     ui.plat=b.dataset.plat; store.set("plat",ui.plat);
     document.querySelectorAll("[data-plat]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
+    tick();
+  });
+});
+document.querySelectorAll("[data-party]").forEach(b=>{
+  b.setAttribute("aria-pressed", String(+b.dataset.party===ui.party));
+  b.addEventListener("click",()=>{
+    ui.party=+b.dataset.party; store.set("party",ui.party);
+    document.querySelectorAll("[data-party]").forEach(x=>x.setAttribute("aria-pressed",String(x===b)));
     tick();
   });
 });
