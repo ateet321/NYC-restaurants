@@ -176,7 +176,7 @@
   <footer>
     All times <b>Eastern</b>. "Opens" = the reservation date released at that drop. Tap a row for details and a booking link.
     <b>Ramen By Ra</b> drops only on the 1st &amp; 15th; <b>Ambassadors Clubhouse</b> releases about two weeks before each month.
-    30 restaurants. Last checked 2026-10-21 against venue sites, Resy, The Infatuation and trackers (itsadate.nyc, ReservationFinder, Snatchd).
+    32 restaurants. Last checked 2026-10-21 against venue sites, Resy, The Infatuation and trackers (itsadate.nyc, ReservationFinder, Snatchd).
     &#10003; = confirmed by at least two sources or the venue; ? = not confirmed. Restaurants change these without notice.
   </footer>
 </div>
@@ -272,6 +272,21 @@ const REST = [
   "url": "https://resy.com/cities/new-york-ny/venues/coqodaq"
  },
  {
+  "name": "The Corner Store",
+  "plat": "DoorDash",
+  "cls": "other",
+  "dropMin": 0,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "NEW: West Broadway, Soho; 30d at midnight per Scoopd (Aug 2026), itsadate.nyc agrees on 30d; Infatuation says 2 weeks; VIP access via SevenRooms",
+  "v": false,
+  "checked": "2026-10-21",
+  "window": "30 days in advance",
+  "url": ""
+ },
+ {
   "name": "Don Angie",
   "plat": "OpenTable",
   "cls": "opentable",
@@ -299,6 +314,21 @@ const REST = [
   "checked": "2026-10-20",
   "window": "no fixed rolling window",
   "url": "https://www.opentable.com/r/indienne-elder-british-indian-chophouse-new-york"
+ },
+ {
+  "name": "The Four Horsemen",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": 420,
+  "rule": {
+   "type": "days",
+   "n": 30
+  },
+  "note": "7 AM drop — earliest on the board",
+  "v": true,
+  "checked": "2026-10-20",
+  "window": "30 days in advance",
+  "url": "https://resy.com/cities/new-york-ny/venues/the-four-horsemen"
  },
  {
   "name": "Graciela",
@@ -435,6 +465,21 @@ const REST = [
   "url": "https://resy.com/cities/new-york-ny/venues/monkey-bar-nyc"
  },
  {
+  "name": "Or’esh",
+  "plat": "DoorDash",
+  "cls": "other",
+  "dropMin": 600,
+  "rule": {
+   "type": "days",
+   "n": 7
+  },
+  "note": "NEW: 450 W Broadway, Soho; 7 days at 10 AM per venue site; walk-ins only from cancellations (arrive ~3:45 PM)",
+  "v": true,
+  "checked": "2026-10-21",
+  "window": "7 days in advance",
+  "url": "https://www.doordash.com/reservations/r/450wbroadway"
+ },
+ {
   "name": "Ramen By Ra",
   "plat": "Resy",
   "cls": "resy",
@@ -536,21 +581,6 @@ const REST = [
   "checked": "2026-10-20",
   "window": "28 days in advance",
   "url": ""
- },
- {
-  "name": "The Four Horsemen",
-  "plat": "Resy",
-  "cls": "resy",
-  "dropMin": 420,
-  "rule": {
-   "type": "days",
-   "n": 30
-  },
-  "note": "7 AM drop — earliest on the board",
-  "v": true,
-  "checked": "2026-10-20",
-  "window": "30 days in advance",
-  "url": "https://resy.com/cities/new-york-ny/venues/the-four-horsemen"
  },
  {
   "name": "Theodora",
