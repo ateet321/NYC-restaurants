@@ -166,6 +166,7 @@
       <span class="seglbl">Guests</span>
       <button class="pill" data-party="2" aria-pressed="true">2</button>
       <button class="pill" data-party="4" aria-pressed="false">4</button>
+      <button class="pill" data-party="6" aria-pressed="false">6</button>
     </div>
     <input class="search" id="q" type="search" placeholder="Search restaurants or notes" aria-label="Search restaurants">
     <div class="seg" role="group" aria-label="Platform">
@@ -182,7 +183,7 @@
   <footer>
     All times <b>Eastern</b>. "Opens" = the reservation date released at that drop. Tap a row for details and a booking link.
     <b>Ramen By Ra</b> drops only on the 1st &amp; 15th; <b>Ambassadors Clubhouse</b> releases about two weeks before each month.
-    33 restaurants. Last checked 2026-10-23 against venue sites, Resy, The Infatuation and trackers (itsadate.nyc, ReservationFinder, Snatchd).
+    34 restaurants. Last checked 2026-10-25 against venue sites, Resy, The Infatuation and trackers (itsadate.nyc, ReservationFinder, Snatchd).
     &#10003; = confirmed by at least two sources or the venue; ? = not confirmed. Restaurants change these without notice.
   </footer>
 </div>
@@ -529,6 +530,20 @@ const REST = [
   "url": ""
  },
  {
+  "name": "Romy",
+  "plat": "Resy",
+  "cls": "resy",
+  "dropMin": null,
+  "rule": {
+   "type": "unknown"
+  },
+  "note": "NEW: steakhouse and supper club from the Cucina Alba / Baby Luc's team, 199 Prince St (Soho), opened Sept 29, 2026; booking window and drop time not published yet",
+  "v": false,
+  "checked": "2026-10-25",
+  "window": "unknown",
+  "url": "https://resy.com/cities/new-york-ny/venues/romy"
+ },
+ {
   "name": "Semma",
   "plat": "SevenRooms",
   "cls": "other",
@@ -685,7 +700,7 @@ const store = {
   get(k,d){ try{ const v=localStorage.getItem("dropboard."+k); return v===null?d:JSON.parse(v); }catch(e){ return d; } },
   set(k,v){ try{ localStorage.setItem("dropboard."+k, JSON.stringify(v)); }catch(e){} }
 };
-const ui = { party:[2,4].includes(store.get("party",2))?store.get("party",2):2, plat:store.get("plat","all"), hidePast:store.get("hidePast",false), q:"", open:new Set() };
+const ui = { party:[2,4,6].includes(store.get("party",2))?store.get("party",2):2, plat:store.get("plat","all"), hidePast:store.get("hidePast",false), q:"", open:new Set() };
 
 function nyNow(){
   const p = new Intl.DateTimeFormat("en-US",{timeZone:"America/New_York",
